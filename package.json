@@ -61,7 +61,9 @@
         "type-check": "tsc",
         "test": "tsx tests",
         "prepack": "pnpm build && clean-pkg-json",
-        "prettier": "prettier"
+        "prettier": "prettier",
+        "eval:corpus": "tsx tests/eval/golden/extract-corpus.ts",
+        "eval:golden": "tsx tests/eval/golden/run.ts"
     },
     "simple-git-hooks": {
         "pre-commit": "pnpm lint-staged"

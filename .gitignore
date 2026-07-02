@@ -69,3 +69,7 @@ testem.log
 
 # System Files
 Thumbs.db
+
+# golden eval artifacts (regenerated per run)
+tests/eval/golden/report.json
+tests/eval/golden/report.md
