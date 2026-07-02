@@ -92,6 +92,7 @@ _aicommit2_ automatically generates commit messages using AI. It supports [Git](
 |----------|---------------|---------------|
 | OpenAI | `gpt-4o-mini` | [Guide](docs/providers/openai.md) |
 | Copilot SDK (Preview) | `gpt-4.1` | [Guide](docs/providers/copilot-sdk.md) |
+| Claude Code (Preview) | `sonnet` | [Guide](docs/providers/claude-code.md) |
 | OpenRouter | `openrouter/auto` | [Guide](docs/providers/openrouter.md) |
 | Anthropic | `claude-sonnet-4-20250514` | [Guide](docs/providers/anthropic.md) |
 | Gemini | `gemini-3-flash-preview` | [Guide](docs/providers/gemini.md) |
@@ -110,6 +111,8 @@ _aicommit2_ automatically generates commit messages using AI. It supports [Git](
 > 📘 GitHub note: `COPILOT_SDK` uses Copilot CLI authentication (`Copilot Requests` permission), while `GITHUB_MODELS` uses GitHub Models API tokens (`models: read`).
 >
 > 📘 Copilot SDK stable setup example (`config.ini` + env): [Copilot SDK Guide](docs/providers/copilot-sdk.md#recommended-configini-stable-baseline).
+>
+> 📘 Claude Code note: `CLAUDE_CODE` runs your locally installed Claude Code CLI with your Claude subscription (Pro/Max) — no API key. It is meant for terminal usage of `aicommit2`; it is not intended to be called from inside a Claude Code agent session. See [Claude Code Guide](docs/providers/claude-code.md).
 
 ## Setup
 

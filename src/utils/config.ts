@@ -39,6 +39,7 @@ export const hasOwn = (object: unknown, key: PropertyKey) => hasOwnProperty.call
 export const BUILTIN_SERVICES = [
     'OPENAI',
     'COPILOT_SDK',
+    'CLAUDE_CODE',
     'OPENROUTER',
     'OLLAMA',
     'HUGGINGFACE',
@@ -378,6 +379,46 @@ const generalConfigParsers = {
         return parsed;
     },
 } as const;
+
+// Shared by subscription-CLI providers (COPILOT_SDK, CLAUDE_CODE).
+// No implicit default model: an explicitly configured model is the opt-in
+// signal that activates the provider (issue #254). Each service falls back
+// to its own default model at request time.
+const subscriptionCliConfigParsers = {
+    key: (key?: string) => key || '',
+    envKey: (envKey?: string) => envKey || '',
+    model: (model?: string | string[]): string[] => {
+        if (!model) {
+            return [];
+        }
+        const modelList = typeof model === 'string' ? model.split(',') : model;
+        return modelList.map(m => m.trim()).filter(Boolean);
+    },
+    systemPrompt: generalConfigParsers.systemPrompt,
+    systemPromptPath: generalConfigParsers.systemPromptPath,
+    codeReviewPromptPath: generalConfigParsers.codeReviewPromptPath,
+    timeout: generalConfigParsers.timeout,
+    temperature: generalConfigParsers.temperature,
+    maxTokens: generalConfigParsers.maxTokens,
+    logging: generalConfigParsers.logging,
+    locale: generalConfigParsers.locale,
+    generate: generalConfigParsers.generate,
+    type: generalConfigParsers.type,
+    maxLength: generalConfigParsers.maxLength,
+    includeBody: generalConfigParsers.includeBody,
+    topP: generalConfigParsers.topP,
+    codeReview: generalConfigParsers.codeReview,
+    disabled: generalConfigParsers.disabled,
+    stream: generalConfigParsers.stream,
+    watchMode: generalConfigParsers.watchMode,
+    disableLowerCase: generalConfigParsers.disableLowerCase,
+    ticketExtraction: generalConfigParsers.ticketExtraction,
+    learnConventions: generalConfigParsers.learnConventions,
+    diffCompression: generalConfigParsers.diffCompression,
+    maxHunkLines: generalConfigParsers.maxHunkLines,
+    maxDiffLines: generalConfigParsers.maxDiffLines,
+    diffContext: generalConfigParsers.diffContext,
+};
 
 const modelConfigParsers: Record<ModelName, Record<string, (value: any) => any>> = {
     OPENAI: {
@@ -909,44 +950,8 @@ const modelConfigParsers: Record<ModelName, Record<string, (value: any) => any>>
         maxDiffLines: generalConfigParsers.maxDiffLines,
         diffContext: generalConfigParsers.diffContext,
     },
-    COPILOT_SDK: {
-        key: (key?: string) => key || '',
-        envKey: (envKey?: string) => envKey || '',
-        model: (model?: string | string[]): string[] => {
-            if (!model) {
-                // No implicit default: an explicitly configured model is the opt-in
-                // signal that activates the Copilot SDK provider (issue #254).
-                // The service falls back to COPILOT_SDK_DEFAULT_MODEL at request time.
-                return [];
-            }
-            const modelList = typeof model === 'string' ? model?.split(',') : model;
-            return modelList.map(m => m.trim()).filter(m => !!m && m.length > 0);
-        },
-        systemPrompt: generalConfigParsers.systemPrompt,
-        systemPromptPath: generalConfigParsers.systemPromptPath,
-        codeReviewPromptPath: generalConfigParsers.codeReviewPromptPath,
-        timeout: generalConfigParsers.timeout,
-        temperature: generalConfigParsers.temperature,
-        maxTokens: generalConfigParsers.maxTokens,
-        logging: generalConfigParsers.logging,
-        locale: generalConfigParsers.locale,
-        generate: generalConfigParsers.generate,
-        type: generalConfigParsers.type,
-        maxLength: generalConfigParsers.maxLength,
-        includeBody: generalConfigParsers.includeBody,
-        topP: generalConfigParsers.topP,
-        codeReview: generalConfigParsers.codeReview,
-        disabled: generalConfigParsers.disabled,
-        stream: generalConfigParsers.stream,
-        watchMode: generalConfigParsers.watchMode,
-        disableLowerCase: generalConfigParsers.disableLowerCase,
-        ticketExtraction: generalConfigParsers.ticketExtraction,
-        learnConventions: generalConfigParsers.learnConventions,
-        diffCompression: generalConfigParsers.diffCompression,
-        maxHunkLines: generalConfigParsers.maxHunkLines,
-        maxDiffLines: generalConfigParsers.maxDiffLines,
-        diffContext: generalConfigParsers.diffContext,
-    },
+    COPILOT_SDK: subscriptionCliConfigParsers,
+    CLAUDE_CODE: subscriptionCliConfigParsers,
     BEDROCK: {
         key: (key?: string) => key || '',
         envKey: (envKey?: string) => (envKey && envKey.length > 0 ? envKey : 'BEDROCK_API_KEY'),
