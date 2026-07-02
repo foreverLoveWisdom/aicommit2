@@ -455,8 +455,9 @@ In addition to the main commit message generation, aicommit2 provides several ut
 | Command | Description |
 |---------|-------------|
 | `aicommit2 setup` | Interactive setup wizard for configuring AI providers |
+| `aicommit2 setup lazygit` | Set up the [LazyGit integration](#lazygit) |
 | `aicommit2 config` | Manage configuration (get, set, list, del) |
-| `aicommit2 doctor` | Check health status of AI providers |
+| `aicommit2 doctor` | Check health status of AI providers and integrations |
 | `aicommit2 stats` | View usage statistics and performance metrics |
 | `aicommit2 rewrite` | Rewrite the commit message of any commit using AI |
 | `aicommit2 hook` | Install/uninstall Git prepare-commit-msg hook |
@@ -496,9 +497,44 @@ aicommit2 rewrite HEAD~2 --dry-run   # Preview without rewriting
 
 ### LazyGit
 
-_aicommit2_ supports non-interactive JSON output mode for seamless integration with [LazyGit](https://github.com/jesseduffield/lazygit).
+_aicommit2_ integrates with [LazyGit](https://github.com/jesseduffield/lazygit) so you can generate commit messages without leaving the LazyGit UI.
 
-#### Setup
+#### Quick Setup
+
+```bash
+aicommit2 setup lazygit
+```
+
+This detects your LazyGit config file, backs it up, and adds a custom command. Then in LazyGit:
+
+1. Stage your changes
+2. Press `c` in the Files panel — the full aicommit2 UI opens (multi-provider streaming)
+3. Select a message to commit
+
+Options:
+
+- `--key <key>` — use a different keybinding (default: `c`, which overrides LazyGit's default commit key)
+- `--mode fzf` — install the fzf-based picker with subject + body preview instead (requires `jq` and `fzf`; bound to `C` by default)
+- `--force` — overwrite an existing aicommit2 integration
+
+#### Manual Setup
+
+Add the following to your LazyGit config file (`~/.config/lazygit/config.yml` or `~/Library/Application Support/lazygit/config.yml` on macOS):
+
+```yaml
+customCommands:
+  - key: "c"
+    context: "files"
+    description: "Generate commit message with aicommit2"
+    command: "aicommit2"
+    output: terminal
+```
+
+This runs the full aicommit2 interactive UI in a terminal — streaming, multi-provider, no output parsing involved.
+
+> **Note:** This overrides LazyGit's default `c` (commit) key. You can change the key to another value (e.g., `<c-a>`) if you prefer to keep the default behavior.
+
+#### Advanced: JSON Output (menuFromCommand)
 
 Use the `--output json` flag to get AI-generated commit messages in JSON Lines format:
 
@@ -508,11 +544,7 @@ aicommit2 --output json
 # Output: {"subject":"fix: resolve login bug","body":"Fixes issue with session handling"}
 ```
 
-Each line is a separate JSON object with `subject` and `body` fields, compatible with LazyGit's `menuFromCommand` prompt type.
-
-#### LazyGit Configuration
-
-Add the following to your LazyGit config file (`~/.config/lazygit/config.yml` or `~/Library/Application Support/lazygit/config.yml` on macOS):
+Each line is a separate JSON object with `subject` and `body` fields, compatible with LazyGit's `menuFromCommand` prompt type. On failure, an `{"error":"..."}` object is written to stdout and a readable message to stderr (exit code 1).
 
 ```yaml
 customCommands:
@@ -532,17 +564,13 @@ customCommands:
     command: bash -c 'MSG="{{ .Form.Commit }}" && SUBJ="${MSG%%<SEP>*}" && BODY="${MSG#*<SEP>}" && git commit -e -m "$SUBJ" ${BODY:+-m "$BODY"}'
 ```
 
-> **Note:** This overrides LazyGit's default `c` (commit) key. You can change the key to another value (e.g., `<c-a>`) if you prefer to keep the default behavior.
-
-#### Usage in LazyGit
-
-1. Stage your changes in LazyGit
-2. Press `c` to generate AI commit messages and select one
-3. The editor opens with the selected message for final review
+> **Warning:** The regex filter cannot handle subjects containing double quotes, and multi-line bodies arrive as escaped `\n` sequences. Prefer the [Quick Setup](#quick-setup) recipe above, or the fzf variant below for messages with bodies.
 
 #### Advanced: fzf Preview with Body
 
 For detailed commit messages with **subject + body**, use the fzf-based approach. This uses `--include-body` (`-i`) flag to generate detailed body content and shows a preview window before committing.
+
+> **Tip:** `aicommit2 setup lazygit --mode fzf` installs the script and config entry automatically. The steps below are for manual setup.
 
 **Requirements:** `jq` and `fzf` must be installed (`brew install jq fzf`).
 
@@ -670,7 +698,7 @@ Or manually delete the `.git/hooks/prepare-commit-msg` file.
 
 ### Health Check
 
-Use the `doctor` command to check the status of your configured AI providers:
+Use the `doctor` command to check the status of your configured AI providers and integrations:
 
 ```bash
 aicommit2 doctor
@@ -687,7 +715,10 @@ Providers:
   ⏭️ ANTHROPIC      Not configured
   ⚠️ GEMINI         API key configured
 
-Summary: 2 healthy, 0 error, 1 warning, 1 skipped
+Integrations:
+  ✅ LAZYGIT        Integration configured (~/.config/lazygit/config.yml)
+
+Summary: 3 healthy, 0 error, 1 warning, 1 skipped
 ```
 
 Status icons:

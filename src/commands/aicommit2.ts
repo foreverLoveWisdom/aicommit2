@@ -264,9 +264,11 @@ export default async (
         process.exit();
     })().catch(error => {
         if (outputFormat === 'json') {
-            // Output error as JSON for LazyGit integration
-            const errorJson = { error: error.message || 'Unknown error occurred' };
-            process.stderr.write(JSON.stringify(errorJson) + '\n');
+            // Machine-readable error on stdout (menuFromCommand only reads stdout),
+            // human-readable error on stderr (lazygit shows stderr on non-zero exit)
+            const errorMessage = error.message || 'Unknown error occurred';
+            process.stdout.write(JSON.stringify({ error: errorMessage }) + '\n');
+            process.stderr.write(`aicommit2: ${errorMessage}\n`);
             process.exit(1);
         }
         consoleManager.printError(error.message);
