@@ -1,4 +1,21 @@
+import { createRequire } from 'module';
+
 export const COPILOT_SDK_DEFAULT_MODEL = 'gpt-4.1';
+
+/**
+ * Whether the optional @github/copilot-sdk package can be resolved. The service
+ * imports it lazily at request time, so a missing package is a request-time
+ * failure, not an availability signal (see get-available-ais.ts, issue #256).
+ * doctor uses this to warn the user proactively instead of letting the run fail.
+ */
+export const isCopilotSdkPackageInstalled = (): boolean => {
+    try {
+        createRequire(import.meta.url).resolve('@github/copilot-sdk');
+        return true;
+    } catch {
+        return false;
+    }
+};
 export const COPILOT_SDK_FALLBACK_MODELS = ['gpt-4.1', 'gpt-4o', 'gpt-5-mini'] as const;
 
 /**

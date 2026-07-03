@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import { command } from 'cleye';
 
 import { hasBedrockAccess, hasConfiguredModels } from './get-available-ais.js';
-import { ALL_COPILOT_SDK_KNOWN_MODELS, normalizeCopilotSdkModel } from '../services/ai/copilot-sdk.utils.js';
+import { ALL_COPILOT_SDK_KNOWN_MODELS, isCopilotSdkPackageInstalled, normalizeCopilotSdkModel } from '../services/ai/copilot-sdk.utils.js';
 import {
     GITHUB_MODELS_API_VERSION,
     GITHUB_MODELS_BASE_URL,
@@ -405,6 +405,15 @@ const checkCopilotSdkEnvironment = (
                 ok: false,
                 error: `Node.js ${nodeVersion} is too old for Copilot SDK`,
                 details: 'Copilot SDK v0.2.0 requires node:sqlite support (Node.js 22+ recommended)',
+            };
+        }
+
+        if (!isCopilotSdkPackageInstalled()) {
+            return {
+                ok: false,
+                error: '@github/copilot-sdk package not installed',
+                details:
+                    'The optional dependency is missing (common with Homebrew or --omit=optional installs). Install with: npm install -g @github/copilot-sdk',
             };
         }
 

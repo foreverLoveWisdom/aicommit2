@@ -6,6 +6,7 @@ import {
     getCopilotSdkModelCandidates,
     isCopilotSdkClassicPatError,
     isCopilotSdkModelAccessError,
+    isCopilotSdkPackageInstalled,
     normalizeCopilotSdkModel,
 } from '../../../src/services/ai/copilot-sdk.utils.js';
 
@@ -152,6 +153,35 @@ export default testSuite(({ describe }) => {
 
                 expect(commitAIs).toContain('COPILOT_SDK');
             });
+        });
+
+        test('COPILOT_SDK availability does not depend on the optional SDK package (issue #256)', () => {
+            // Reproduces the reporter config: a single configured model, no key.
+            // Availability must be driven by the opt-in signal alone; probing for
+            // the optional @github/copilot-sdk package silently dropped the
+            // provider on Homebrew / --omit=optional installs even though doctor
+            // reported it healthy.
+            withCopilotToken(undefined, () => {
+                const config = {
+                    codeReview: true,
+                    watchMode: true,
+                    COPILOT_SDK: {
+                        model: ['claude-sonnet-4.5'],
+                        key: '',
+                    },
+                } as any;
+
+                expect(getAvailableAIs(config, 'commit')).toContain('COPILOT_SDK');
+                expect(getAvailableAIs(config, 'review')).toContain('COPILOT_SDK');
+                expect(getAvailableAIs(config, 'watch')).toContain('COPILOT_SDK');
+            });
+        });
+
+        test('isCopilotSdkPackageInstalled resolves the bundled optional dependency', () => {
+            // The package is a devDependency-installed optionalDependency in this
+            // repo, so it must resolve here. In the field it may be absent, which
+            // doctor surfaces as a warning rather than a silent failure.
+            expect(isCopilotSdkPackageInstalled()).toBe(true);
         });
     });
 });
