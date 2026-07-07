@@ -23,13 +23,13 @@
         {
           packages.default = pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
             pname = "aicommit2";
-            version = "v2.6.1";
+            version = "v2.7.0";
             src = self;
 
             pnpmDeps = pkgs.pnpm.fetchDeps {
               inherit (finalAttrs) pname version src;
               fetcherVersion = 3;
-              hash = "sha256-D9H1bkvno+F2uWE3Lj+EWn1ytBknNh0NWJj7Grmm3fk=";
+              hash = "sha256-gvQsnQwcAZ3PvxNSNyQfHFBkf2m7JyY2DYKMXTllW6I=";
             };
 
             nativeBuildInputs = [
