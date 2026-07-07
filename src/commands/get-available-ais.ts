@@ -63,7 +63,7 @@ export const getAvailableAIs = (config: ValidConfig, requestType: RequestType): 
             switch (requestType) {
                 case 'commit':
                     // CLAUDE_CODE opts in via a configured model; the CLI binary is checked at request time.
-                    if (key === 'OLLAMA' || key === 'CLAUDE_CODE') {
+                    if (key === 'OLLAMA' || key === 'CLAUDE_CODE' || key === 'GEMINI_CLI') {
                         return !!value && hasConfiguredModels(value);
                     }
                     if (key === 'COPILOT_SDK') {
@@ -78,7 +78,7 @@ export const getAvailableAIs = (config: ValidConfig, requestType: RequestType): 
                     return !!value.key && value.key.length > 0;
                 case 'review':
                     const codeReview = config.codeReview || value.codeReview;
-                    if (key === 'OLLAMA' || key === 'CLAUDE_CODE') {
+                    if (key === 'OLLAMA' || key === 'CLAUDE_CODE' || key === 'GEMINI_CLI') {
                         return !!value && hasConfiguredModels(value) && codeReview;
                     }
                     if (key === 'COPILOT_SDK') {
@@ -93,7 +93,7 @@ export const getAvailableAIs = (config: ValidConfig, requestType: RequestType): 
                     return !!value.key && value.key.length > 0 && codeReview;
                 case 'watch':
                     const watchMode = config.watchMode || value.watchMode;
-                    if (key === 'OLLAMA' || key === 'CLAUDE_CODE') {
+                    if (key === 'OLLAMA' || key === 'CLAUDE_CODE' || key === 'GEMINI_CLI') {
                         return !!value && hasConfiguredModels(value) && watchMode;
                     }
                     if (key === 'COPILOT_SDK') {
