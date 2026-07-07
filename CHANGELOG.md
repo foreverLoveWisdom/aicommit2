@@ -1,3 +1,16 @@
+# [2.7.0](https://github.com/tak-bro/aicommit2/compare/v2.6.1...v2.7.0) (2026-07-07)
+
+
+### Bug Fixes
+
+* activate COPILOT_SDK on opt-in signal regardless of SDK package ([#256](https://github.com/tak-bro/aicommit2/issues/256)) ([446c4e7](https://github.com/tak-bro/aicommit2/commit/446c4e7f775738d730e5af7a6fb79c7c836914cf)), closes [#254](https://github.com/tak-bro/aicommit2/issues/254)
+
+
+### Features
+
+* add Claude Code CLI provider ([6631adb](https://github.com/tak-bro/aicommit2/commit/6631adb32cd9ccc962ca313afe09ed2aa03d6157)), closes [#254](https://github.com/tak-bro/aicommit2/issues/254)
+* add lazygit integration setup command ([de2fd86](https://github.com/tak-bro/aicommit2/commit/de2fd86adcadf504474eb028160986b83341aaa2))
+
 ## [2.6.1](https://github.com/tak-bro/aicommit2/compare/v2.6.0...v2.6.1) (2026-06-12)
 
 
