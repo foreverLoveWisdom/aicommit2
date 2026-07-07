@@ -19,6 +19,15 @@ export interface TicketRef {
 
 export type ConventionStyle = 'conventional' | 'gitmoji';
 
+/** Style classification of a single commit subject */
+export interface ParsedSubject {
+    style: ConventionStyle | null;
+    /** Conventional type (feat, fix, ...), null for gitmoji/unstructured subjects */
+    type: string | null;
+    /** Conventional scope, null when absent */
+    scope: string | null;
+}
+
 export interface ConventionProfile {
     /** Predominant style across recent commits, null when no clear signal */
     dominantType: ConventionStyle | null;

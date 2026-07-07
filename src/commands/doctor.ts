@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import { command } from 'cleye';
 
 import { hasBedrockAccess, hasConfiguredModels } from './get-available-ais.js';
-import { ALL_COPILOT_SDK_KNOWN_MODELS, normalizeCopilotSdkModel } from '../services/ai/copilot-sdk.utils.js';
+import { ALL_COPILOT_SDK_KNOWN_MODELS, isCopilotSdkPackageInstalled, normalizeCopilotSdkModel } from '../services/ai/copilot-sdk.utils.js';
 import {
     GITHUB_MODELS_API_VERSION,
     GITHUB_MODELS_BASE_URL,
@@ -15,6 +15,7 @@ import {
 import { HttpRequestBuilder } from '../services/http/http-request.builder.js';
 import { BUILTIN_SERVICES, BuiltinService, DEFAULT_OLLAMA_HOST, RawConfig, ValidConfig, getConfig } from '../utils/config.js';
 import { handleCliError } from '../utils/error.js';
+import { findLazygitConfig, hasAicommitIntegration, isLazygitInstalled } from '../utils/lazygit.js';
 
 /**
  * Health check status for a provider
@@ -407,6 +408,15 @@ const checkCopilotSdkEnvironment = (
             };
         }
 
+        if (!isCopilotSdkPackageInstalled()) {
+            return {
+                ok: false,
+                error: '@github/copilot-sdk package not installed',
+                details:
+                    'The optional dependency is missing (common with Homebrew or --omit=optional installs). Install with: npm install -g @github/copilot-sdk',
+            };
+        }
+
         const version = execSync('copilot --version', { stdio: ['ignore', 'pipe', 'pipe'] })
             .toString()
             .trim();
@@ -642,6 +652,45 @@ export const runHealthChecks = async (config: ValidConfig): Promise<ProviderHeal
     return results;
 };
 
+/**
+ * Check lazygit integration status
+ */
+export const checkLazygitIntegration = (): ProviderHealthResult => {
+    if (!isLazygitInstalled()) {
+        return {
+            provider: 'LAZYGIT',
+            status: 'skipped',
+            message: 'lazygit not installed',
+        };
+    }
+
+    const location = findLazygitConfig();
+    if (!location.exists) {
+        return {
+            provider: 'LAZYGIT',
+            status: 'warning',
+            message: 'No lazygit config found',
+            details: 'Run `aicommit2 setup lazygit` to configure',
+        };
+    }
+
+    if (!hasAicommitIntegration(location.path)) {
+        return {
+            provider: 'LAZYGIT',
+            status: 'warning',
+            message: 'Integration not configured',
+            details: 'Run `aicommit2 setup lazygit` to configure',
+        };
+    }
+
+    return {
+        provider: 'LAZYGIT',
+        status: 'healthy',
+        message: 'Integration configured',
+        details: location.path,
+    };
+};
+
 // Pre-calculate max provider name length for consistent formatting
 const MAX_PROVIDER_LENGTH = Math.max(...BUILTIN_SERVICES.map(s => s.length));
 
@@ -650,27 +699,36 @@ const formatProviderName = (name: string): string => name.padEnd(MAX_PROVIDER_LE
 /**
  * Print health check results to console
  */
-const printResults = (results: ProviderHealthResult[]): void => {
+const printResults = (results: ProviderHealthResult[], integrations: ProviderHealthResult[] = []): void => {
     console.log('');
     console.log(chalk.bold('🩺 aicommit2 Health Check'));
     console.log('');
     console.log(chalk.bold('Providers:'));
 
-    for (const result of results) {
+    const printResultLine = (result: ProviderHealthResult) => {
         const icon = STATUS_ICONS[result.status];
         const name = formatProviderName(result.provider);
         const message = STATUS_LABELS[result.status](result.message);
         const details = result.details ? chalk.gray(` (${result.details})`) : '';
 
         console.log(`  ${icon} ${name}  ${message}${details}`);
+    };
+
+    results.forEach(printResultLine);
+
+    if (integrations.length > 0) {
+        console.log('');
+        console.log(chalk.bold('Integrations:'));
+        integrations.forEach(printResultLine);
     }
 
     // Summary
+    const allResults = [...results, ...integrations];
     const counts = {
-        healthy: results.filter(r => r.status === 'healthy').length,
-        error: results.filter(r => r.status === 'error').length,
-        warning: results.filter(r => r.status === 'warning').length,
-        skipped: results.filter(r => r.status === 'skipped').length,
+        healthy: allResults.filter(r => r.status === 'healthy').length,
+        error: allResults.filter(r => r.status === 'error').length,
+        warning: allResults.filter(r => r.status === 'warning').length,
+        skipped: allResults.filter(r => r.status === 'skipped').length,
     };
 
     console.log('');
@@ -708,7 +766,7 @@ export const doctorCommand = command(
         (async () => {
             const config = await getConfig({}, []);
             const results = await runHealthChecks(config);
-            printResults(results);
+            printResults(results, [checkLazygitIntegration()]);
         })().catch(error => {
             console.error(chalk.red(error.message));
             handleCliError(error);

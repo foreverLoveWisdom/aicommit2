@@ -1,4 +1,4 @@
-import { ConventionProfile, ConventionStyle } from './types.js';
+import { ConventionProfile, ConventionStyle, ParsedSubject } from './types.js';
 
 // conventional: "feat(scope): ..." / "fix!: ..." — capture type + optional scope.
 const CONVENTIONAL_PATTERN = /^(\w+)(?:\(([\w\-./]+)\))?!?:\s/;
@@ -6,6 +6,25 @@ const CONVENTIONAL_PATTERN = /^(\w+)(?:\(([\w\-./]+)\))?!?:\s/;
 const GITMOJI_PATTERN = /^(:\w+:|\p{Extended_Pictographic})/u;
 
 const MAX_SCOPES = 5;
+
+/**
+ * Classify a single commit subject by convention style.
+ *
+ * The atomic classification analyzeConventions aggregates — exported so
+ * consumers that score subjects against a ConventionProfile (e.g. the
+ * golden eval) use the exact same lens, instead of drifting copies.
+ */
+export const parseSubject = (subject: string): ParsedSubject => {
+    const conventionalMatch = subject.match(CONVENTIONAL_PATTERN);
+    if (conventionalMatch) {
+        const [, type, scope] = conventionalMatch;
+        return { style: 'conventional', type, scope: scope || null };
+    }
+    if (GITMOJI_PATTERN.test(subject)) {
+        return { style: 'gitmoji', type: null, scope: null };
+    }
+    return { style: null, type: null, scope: null };
+};
 
 const topKeys = (counts: Record<string, number>, limit: number): string[] =>
     Object.entries(counts)
@@ -45,18 +64,17 @@ export const analyzeConventions = (subjects: string[]): ConventionProfile | null
     for (const subject of cleaned) {
         lengthSum += subject.length;
 
-        const conventionalMatch = subject.match(CONVENTIONAL_PATTERN);
-        if (conventionalMatch) {
+        const parsed = parseSubject(subject);
+        if (parsed.style === 'conventional' && parsed.type) {
             conventionalCount++;
-            const [, type, scope] = conventionalMatch;
-            typeDistribution[type] = (typeDistribution[type] || 0) + 1;
-            if (scope) {
-                scopeCounts[scope] = (scopeCounts[scope] || 0) + 1;
+            typeDistribution[parsed.type] = (typeDistribution[parsed.type] || 0) + 1;
+            if (parsed.scope) {
+                scopeCounts[parsed.scope] = (scopeCounts[parsed.scope] || 0) + 1;
             }
             continue;
         }
 
-        if (GITMOJI_PATTERN.test(subject)) {
+        if (parsed.style === 'gitmoji') {
             gitmojiCount++;
         }
     }

@@ -33,6 +33,12 @@ export const ErrorCode = {
     TIMEOUT: 'TIMEOUT',
     SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
 
+    // CLI provider errors
+    CLI_NOT_INSTALLED: 'CLI_NOT_INSTALLED',
+
+    // Response errors
+    NO_CONTENT: 'NO_CONTENT',
+
     // VCS errors
     NO_STAGED_CHANGES: 'NO_STAGED_CHANGES',
     EMPTY_COMMIT_MESSAGE: 'EMPTY_COMMIT_MESSAGE',

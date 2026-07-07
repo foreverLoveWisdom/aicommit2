@@ -5,6 +5,7 @@ describe('aicommit2', ({ runTestSuite }) => {
     runTestSuite(import('./specs/openai/index.js'));
     runTestSuite(import('./specs/github-models/index.js'));
     runTestSuite(import('./specs/copilot-sdk/index.js'));
+    runTestSuite(import('./specs/claude-code/index.js'));
     runTestSuite(import('./specs/openrouter/index.js'));
     runTestSuite(import('./specs/bedrock/index.js'));
     runTestSuite(import('./specs/config.js'));
@@ -14,6 +15,7 @@ describe('aicommit2', ({ runTestSuite }) => {
     runTestSuite(import('./specs/vcs/index.js'));
     runTestSuite(import('./specs/managers/index.js'));
     runTestSuite(import('./specs/utils/index.js'));
+    runTestSuite(import('./specs/eval/index.js'));
     runTestSuite(import('./specs/diff-compressor.js'));
     runTestSuite(import('./specs/doctor.js'));
     runTestSuite(import('./specs/stats.js'));

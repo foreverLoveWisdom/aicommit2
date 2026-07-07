@@ -62,6 +62,13 @@ You can still run tests that don't require `OPENAI_KEY` but will not test the ma
 pnpm test
 ```
 
+There is also a golden-corpus eval harness that measures commit-message quality against real repo history (requires a logged-in [Claude Code CLI](https://claude.com/claude-code), no API key):
+
+```sh
+pnpm eval:corpus   # snapshot real commits into tests/eval/golden/corpus.json
+pnpm eval:golden   # regenerate messages and score enriched vs baseline context
+```
+
 ## Using & testing your changes
 
 Let's say you made some changes in a fork/branch and you want to test it in a project. You can publish the package to a GitHub branch using [`git-publish`](https://github.com/privatenumber/git-publish):
