@@ -8,6 +8,7 @@ import {
     isCopilotSdkModelAccessError,
     isCopilotSdkPackageInstalled,
     normalizeCopilotSdkModel,
+    resolveCopilotSdkToken,
 } from '../../../src/services/ai/copilot-sdk.utils.js';
 
 export default testSuite(({ describe }) => {
@@ -65,6 +66,35 @@ export default testSuite(({ describe }) => {
             expect(options.env?.COPILOT_GITHUB_TOKEN).toBe(undefined);
             expect(options.env?.GH_TOKEN).toBe(undefined);
             expect(options.env?.GITHUB_TOKEN).toBe(undefined);
+        });
+
+        test('builds client options from an explicit resolved token without reading env', () => {
+            const options = buildCopilotSdkClientOptions({ GH_TOKEN: 'ghp_bad' }, 'gho_from_gh');
+            expect(options.githubToken).toBe('gho_from_gh');
+            expect(options.useLoggedInUser).toBe(false);
+            expect(options.env?.COPILOT_GITHUB_TOKEN).toBe('gho_from_gh');
+            expect(options.env?.GH_TOKEN).toBe(undefined);
+        });
+
+        test('resolveCopilotSdkToken prefers COPILOT_GITHUB_TOKEN and skips gh', () => {
+            let ghCalled = false;
+            const ghReader = () => {
+                ghCalled = true;
+                return 'gho_gh';
+            };
+            const token = resolveCopilotSdkToken({ COPILOT_GITHUB_TOKEN: 'github_pat_env' }, ghReader);
+            expect(token).toBe('github_pat_env');
+            expect(ghCalled).toBe(false);
+        });
+
+        test('resolveCopilotSdkToken falls back to the gh reader when no env token', () => {
+            const token = resolveCopilotSdkToken({}, () => 'gho_gh');
+            expect(token).toBe('gho_gh');
+        });
+
+        test('resolveCopilotSdkToken returns undefined when neither env nor gh yields a token', () => {
+            const token = resolveCopilotSdkToken({ COPILOT_GITHUB_TOKEN: '   ' }, () => undefined);
+            expect(token).toBe(undefined);
         });
 
         test('COPILOT_SDK is available without API key when model is configured', () => {

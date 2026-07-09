@@ -4,7 +4,13 @@ import chalk from 'chalk';
 import { command } from 'cleye';
 
 import { hasBedrockAccess, hasConfiguredModels } from './get-available-ais.js';
-import { ALL_COPILOT_SDK_KNOWN_MODELS, isCopilotSdkPackageInstalled, normalizeCopilotSdkModel } from '../services/ai/copilot-sdk.utils.js';
+import {
+    ALL_COPILOT_SDK_KNOWN_MODELS,
+    buildCopilotSdkClientOptions,
+    isCopilotSdkPackageInstalled,
+    normalizeCopilotSdkModel,
+    resolveCopilotSdkToken,
+} from '../services/ai/copilot-sdk.utils.js';
 import {
     GITHUB_MODELS_API_VERSION,
     GITHUB_MODELS_BASE_URL,
@@ -378,57 +384,114 @@ const checkGitHubModelsConnection = async (
     }
 };
 
-const checkCopilotSdkEnvironment = (
-    providerConfig: RawConfig
-): { ok: boolean; error?: string; details?: string; modelWarning?: string } => {
+// Minimal shape of the lazily-imported Copilot SDK client used by the auth probe.
+type CopilotProbeClient = {
+    start: () => Promise<void>;
+    getAuthStatus: () => Promise<{ isAuthenticated?: boolean; authType?: string }>;
+    stop?: () => Promise<unknown> | unknown;
+};
+
+const withTimeout = <T>(promise: Promise<T>, ms: number, message: string): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(message)), ms);
+        promise.then(
+            value => {
+                clearTimeout(timer);
+                resolve(value);
+            },
+            error => {
+                clearTimeout(timer);
+                reject(error);
+            }
+        );
+    });
+
+/**
+ * Actually authenticate against the Copilot SDK the same way a real request does:
+ * spawn the CLI server with the resolved auth options and call getAuthStatus.
+ * This closes the gap where doctor reported "healthy" on CLI presence alone while
+ * runtime auth failed (issue #259).
+ */
+const probeCopilotSdkAuth = async (
+    timeout: number
+): Promise<{ ok: boolean; authenticated: boolean; authType?: string; error?: string }> => {
+    let client: CopilotProbeClient | undefined;
+    try {
+        const sdkModule = (await import('@github/copilot-sdk')) as unknown as {
+            CopilotClient: new (options?: unknown) => CopilotProbeClient;
+        };
+        const options = buildCopilotSdkClientOptions(process.env, resolveCopilotSdkToken(process.env));
+        client = new sdkModule.CopilotClient(options);
+        const timeoutMessage = 'Copilot SDK authentication check timed out';
+        await withTimeout(client.start(), timeout, timeoutMessage);
+        const status = await withTimeout(client.getAuthStatus(), timeout, timeoutMessage);
+        return { ok: true, authenticated: status.isAuthenticated === true, authType: status.authType };
+    } catch (error) {
+        return { ok: false, authenticated: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+        if (client?.stop) {
+            try {
+                await client.stop();
+            } catch {
+                // Ignore stop failures so they don't mask the probe result.
+            }
+        }
+    }
+};
+
+// Static (non-network) prerequisites for COPILOT_SDK. Returns a failure reason,
+// or null when the environment is ready for the live auth probe.
+const checkCopilotSdkPrereqs = (model: string): { error: string; details?: string } | null => {
+    if (!model) {
+        return { error: 'No model configured' };
+    }
+
+    const copilotEnvToken = (process.env.COPILOT_GITHUB_TOKEN || '').trim();
+    if (copilotEnvToken.startsWith('ghp_')) {
+        return {
+            error: 'Unsupported classic PAT in COPILOT_GITHUB_TOKEN',
+            details: 'Copilot CLI requires Fine-Grained PAT (github_pat_...) or Copilot login flow',
+        };
+    }
+
+    const nodeMajor = Number(process.versions.node.split('.')[0] || '0');
+    if (Number.isFinite(nodeMajor) && nodeMajor < 22) {
+        return {
+            error: `Node.js ${process.versions.node} is too old for Copilot SDK`,
+            details: 'Copilot SDK v0.2.0 requires node:sqlite support (Node.js 22+ recommended)',
+        };
+    }
+
+    if (!isCopilotSdkPackageInstalled()) {
+        return {
+            error: '@github/copilot-sdk package not installed',
+            details:
+                'The optional dependency is missing (common with Homebrew or --omit=optional installs). Install with: npm install -g @github/copilot-sdk',
+        };
+    }
+
+    return null;
+};
+
+const checkCopilotSdkEnvironment = async (
+    providerConfig: RawConfig,
+    timeout: number
+): Promise<{ ok: boolean; error?: string; details?: string; modelWarning?: string }> => {
     const model = Array.isArray(providerConfig.model)
         ? String(providerConfig.model[0] || '').trim()
         : String(providerConfig.model || '').trim();
-    if (!model) {
-        return { ok: false, error: 'No model configured' };
+
+    const prereqFailure = checkCopilotSdkPrereqs(model);
+    if (prereqFailure) {
+        return { ok: false, ...prereqFailure };
     }
 
+    const nodeVersion = process.versions.node;
+    let version = '';
     try {
-        const copilotEnvToken = (process.env.COPILOT_GITHUB_TOKEN || '').trim();
-        if (copilotEnvToken.startsWith('ghp_')) {
-            return {
-                ok: false,
-                error: 'Unsupported classic PAT in COPILOT_GITHUB_TOKEN',
-                details: 'Copilot CLI requires Fine-Grained PAT (github_pat_...) or Copilot login flow',
-            };
-        }
-
-        const nodeVersion = process.versions.node;
-        const nodeMajor = Number(nodeVersion.split('.')[0] || '0');
-        if (Number.isFinite(nodeMajor) && nodeMajor < 22) {
-            return {
-                ok: false,
-                error: `Node.js ${nodeVersion} is too old for Copilot SDK`,
-                details: 'Copilot SDK v0.2.0 requires node:sqlite support (Node.js 22+ recommended)',
-            };
-        }
-
-        if (!isCopilotSdkPackageInstalled()) {
-            return {
-                ok: false,
-                error: '@github/copilot-sdk package not installed',
-                details:
-                    'The optional dependency is missing (common with Homebrew or --omit=optional installs). Install with: npm install -g @github/copilot-sdk',
-            };
-        }
-
-        const version = execSync('copilot --version', { stdio: ['ignore', 'pipe', 'pipe'] })
+        version = execSync('copilot --version', { stdio: ['ignore', 'pipe', 'pipe'] })
             .toString()
             .trim();
-        const normalizedModel = normalizeCopilotSdkModel(model);
-        const isKnownModel = ALL_COPILOT_SDK_KNOWN_MODELS.includes(normalizedModel);
-        const modelWarning = isKnownModel ? undefined : `Model '${model}' is not in the known working models list and may not work`;
-
-        return {
-            ok: true,
-            details: version ? `CLI: ${version}; Model: ${model}; Node: ${nodeVersion}` : `Model: ${model}; Node: ${nodeVersion}`,
-            modelWarning,
-        };
     } catch {
         return {
             ok: false,
@@ -436,6 +499,36 @@ const checkCopilotSdkEnvironment = (
             details: 'Install and authenticate Copilot CLI before using COPILOT_SDK provider',
         };
     }
+
+    // Probe real authentication, not just CLI presence (issue #259).
+    const auth = await probeCopilotSdkAuth(timeout);
+    if (!auth.ok) {
+        return {
+            ok: false,
+            error: 'Could not verify Copilot authentication',
+            details: `${auth.error || 'auth probe failed'}. Run \`copilot\` to log in, or set COPILOT_GITHUB_TOKEN.`,
+        };
+    }
+    if (!auth.authenticated) {
+        return {
+            ok: false,
+            error: 'Copilot CLI installed but SDK is not authenticated',
+            details: 'Run `copilot` to log in, `gh auth login --scopes copilot`, or set COPILOT_GITHUB_TOKEN (fine-grained PAT).',
+        };
+    }
+
+    const normalizedModel = normalizeCopilotSdkModel(model);
+    const isKnownModel = ALL_COPILOT_SDK_KNOWN_MODELS.includes(normalizedModel);
+    const modelWarning = isKnownModel ? undefined : `Model '${model}' is not in the known working models list and may not work`;
+
+    const authLabel = auth.authType ? `; Auth: ${auth.authType}` : '';
+    return {
+        ok: true,
+        details: version
+            ? `CLI: ${version}${authLabel}; Model: ${model}; Node: ${nodeVersion}`
+            : `Model: ${model}${authLabel}; Node: ${nodeVersion}`,
+        modelWarning,
+    };
 };
 
 /**
@@ -572,7 +665,7 @@ const checkProviderHealth = async (provider: BuiltinService, providerConfig: Raw
             };
         }
 
-        const result = checkCopilotSdkEnvironment(providerConfig);
+        const result = await checkCopilotSdkEnvironment(providerConfig, timeout);
         if (!result.ok) {
             return {
                 provider,

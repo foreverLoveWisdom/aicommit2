@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import { createRequire } from 'module';
 
 export const COPILOT_SDK_DEFAULT_MODEL = 'gpt-4.1';
@@ -107,7 +108,54 @@ export const isCopilotSdkClassicPatError = (message: string): boolean => {
     return normalized.includes('classic personal access tokens') && normalized.includes('ghp_');
 };
 
-export const buildCopilotSdkClientOptions = (env: NodeJS.ProcessEnv = process.env): CopilotSdkClientOptions => {
+/**
+ * Read a Copilot-scoped token from the GitHub CLI. The Copilot CLI's own OAuth
+ * token lives in the OS keychain (not file-readable), so `gh` is the reliable
+ * explicit-token source. Gated on the `copilot` scope: a repo-only gh token
+ * would authenticate but be rejected by Copilot, so we skip it and let the
+ * caller fall back to useLoggedInUser. Returns undefined when gh is absent,
+ * logged out, or lacks the scope (issue #259).
+ */
+export const readGhCopilotToken = (): string | undefined => {
+    try {
+        const status = execSync('gh auth status 2>&1', { stdio: ['ignore', 'pipe', 'pipe'] }).toString();
+        const hasCopilotScope = status.toLowerCase().includes("'copilot'");
+        if (!hasCopilotScope) {
+            return undefined;
+        }
+        const token = execSync('gh auth token', { stdio: ['ignore', 'pipe', 'pipe'] })
+            .toString()
+            .trim();
+        return token || undefined;
+    } catch {
+        // gh not installed, not authenticated, or unexpected output — fall back.
+        return undefined;
+    }
+};
+
+/**
+ * Resolve an explicit Copilot token, preferring COPILOT_GITHUB_TOKEN and
+ * falling back to a Copilot-scoped gh token. Returns undefined when neither is
+ * available so the caller uses useLoggedInUser. ghReader is injectable for tests.
+ */
+export const resolveCopilotSdkToken = (
+    env: NodeJS.ProcessEnv = process.env,
+    ghReader: () => string | undefined = readGhCopilotToken
+): string | undefined => {
+    const envToken = (env.COPILOT_GITHUB_TOKEN || '').trim();
+    if (envToken) {
+        return envToken;
+    }
+    return ghReader();
+};
+
+/**
+ * Build Copilot SDK client options. Never invokes gh itself: callers resolve the
+ * token once (via resolveCopilotSdkToken) and pass it as resolvedToken so the gh
+ * subprocess is not repeated across the model-retry loop. Without a token, falls
+ * back to useLoggedInUser (the SDK's stored-OAuth/gh discovery).
+ */
+export const buildCopilotSdkClientOptions = (env: NodeJS.ProcessEnv = process.env, resolvedToken?: string): CopilotSdkClientOptions => {
     const sanitizedEnv: NodeJS.ProcessEnv = { ...env };
 
     // Suppress Node.js ExperimentalWarning (e.g., SQLite) in the Copilot CLI subprocess.
@@ -117,11 +165,11 @@ export const buildCopilotSdkClientOptions = (env: NodeJS.ProcessEnv = process.en
     delete sanitizedEnv.GH_TOKEN;
     delete sanitizedEnv.GITHUB_TOKEN;
 
-    const copilotToken = (env.COPILOT_GITHUB_TOKEN || '').trim();
-    if (copilotToken.length > 0) {
-        sanitizedEnv.COPILOT_GITHUB_TOKEN = copilotToken;
+    const explicitToken = (resolvedToken ?? env.COPILOT_GITHUB_TOKEN ?? '').trim();
+    if (explicitToken.length > 0) {
+        sanitizedEnv.COPILOT_GITHUB_TOKEN = explicitToken;
         return {
-            githubToken: copilotToken,
+            githubToken: explicitToken,
             useLoggedInUser: false,
             env: sanitizedEnv,
         };
