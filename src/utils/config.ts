@@ -40,6 +40,7 @@ export const BUILTIN_SERVICES = [
     'OPENAI',
     'COPILOT_SDK',
     'CLAUDE_CODE',
+    'GEMINI_CLI',
     'OPENROUTER',
     'OLLAMA',
     'HUGGINGFACE',
@@ -380,7 +381,7 @@ const generalConfigParsers = {
     },
 } as const;
 
-// Shared by subscription-CLI providers (COPILOT_SDK, CLAUDE_CODE).
+// Shared by subscription-CLI providers (COPILOT_SDK, CLAUDE_CODE, GEMINI_CLI).
 // No implicit default model: an explicitly configured model is the opt-in
 // signal that activates the provider (issue #254). Each service falls back
 // to its own default model at request time.
@@ -952,6 +953,7 @@ const modelConfigParsers: Record<ModelName, Record<string, (value: any) => any>>
     },
     COPILOT_SDK: subscriptionCliConfigParsers,
     CLAUDE_CODE: subscriptionCliConfigParsers,
+    GEMINI_CLI: subscriptionCliConfigParsers,
     BEDROCK: {
         key: (key?: string) => key || '',
         envKey: (envKey?: string) => (envKey && envKey.length > 0 ? envKey : 'BEDROCK_API_KEY'),

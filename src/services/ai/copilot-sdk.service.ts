@@ -11,6 +11,7 @@ import {
     isCopilotSdkAuthError,
     isCopilotSdkClassicPatError,
     isCopilotSdkModelAccessError,
+    resolveCopilotSdkToken,
 } from './copilot-sdk.utils.js';
 import { RequestType, logAIComplete, logAIError, logAIPayload, logAIPrompt, logAIRequest, logAIResponse } from '../../utils/ai-log.js';
 import { codeReviewPrompt, generatePrompt } from '../../utils/prompt.js';
@@ -49,7 +50,7 @@ export class CopilotSdkService extends AIService {
             return 'Copilot rejected classic ghp_ token. Use COPILOT_GITHUB_TOKEN with a Fine-Grained PAT or authenticate via copilot /login.';
         }
         if (error.code === 'AUTHENTICATION_FAILED' || isCopilotSdkAuthError(message)) {
-            return 'Copilot authentication failed. Install/authenticate Copilot CLI, then retry.';
+            return 'Copilot authentication failed. Run `copilot` to log in, `gh auth login --scopes copilot`, or set COPILOT_GITHUB_TOKEN, then retry.';
         }
         if (message.includes('ERR_UNKNOWN_BUILTIN_MODULE') && message.includes('node:sqlite')) {
             return 'Copilot SDK requires a newer Node.js runtime (node:sqlite is unavailable). Please use Node.js 22+ and retry.';
@@ -137,6 +138,9 @@ export class CopilotSdkService extends AIService {
         const modelCandidates = getCopilotSdkModelCandidates(configuredModel);
         const { logging } = this.params.config;
 
+        // Resolve the auth token once (may spawn `gh`), not per model-retry iteration.
+        const resolvedToken = resolveCopilotSdkToken(process.env);
+
         let lastError: AIServiceError | undefined;
         for (const model of modelCandidates) {
             const url = 'copilot-sdk://session';
@@ -155,7 +159,7 @@ export class CopilotSdkService extends AIService {
             const startTime = Date.now();
             let client: CopilotSdkClient | undefined;
             try {
-                const clientOptions = buildCopilotSdkClientOptions(process.env);
+                const clientOptions = buildCopilotSdkClientOptions(process.env, resolvedToken);
                 client = new CopilotClient(clientOptions);
                 const session = await client.createSession({
                     model,
