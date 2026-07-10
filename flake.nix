@@ -23,7 +23,7 @@
         {
           packages.default = pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
             pname = "aicommit2";
-            version = "v2.7.0";
+            version = "v2.8.0";
             src = self;
 
             pnpmDeps = pkgs.pnpm.fetchDeps {
