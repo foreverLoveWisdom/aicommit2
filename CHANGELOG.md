@@ -1,3 +1,15 @@
+# [2.8.0](https://github.com/tak-bro/aicommit2/compare/v2.7.0...v2.8.0) (2026-07-10)
+
+
+### Bug Fixes
+
+* **copilot-sdk:** verify real auth in doctor and add gh token fallback ([#259](https://github.com/tak-bro/aicommit2/issues/259)) ([1c60bd6](https://github.com/tak-bro/aicommit2/commit/1c60bd67421dfd9d2b330c3654865a1ac6b0554f))
+
+
+### Features
+
+* add Gemini CLI provider ([c1bcb31](https://github.com/tak-bro/aicommit2/commit/c1bcb311e262e5c5cce6bdd704cc71b39b413433)), closes [#254](https://github.com/tak-bro/aicommit2/issues/254)
+
 # [2.7.0](https://github.com/tak-bro/aicommit2/compare/v2.6.1...v2.7.0) (2026-07-07)
 
 
